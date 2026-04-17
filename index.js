@@ -10,7 +10,6 @@ const client = new Client({
   ],
 });
 
-require('dotenv').config();
 const TOKEN = process.env.TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 
