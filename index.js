@@ -18,14 +18,12 @@ const CHANNEL_ID = process.env.CHANNEL_ID;
 const CLIPPEURS = [
   { username: "laurent005584", id: "1295112247563259987" },
   { username: "jeanbaptiste3494", id: "695582447441543228" },
-  { username: "power_29476", id: null },
   { username: "gowizzus", id: "1106304129745305692" },
   { username: "caba4526", id: "1123510632604508170" },
   { username: "batultim3555", id: "999630067024011285" },
   { username: "maxime_1610", id: "499586906598932511" },
   { username: "zan0m", id: "769635925994635285" },
   { username: "ykama.", id: "1044715544026292224" },
-  { username: "cheval1465", id: null },
   { username: "r_xphael", id: "1274481696561172623" },
   { username: "wwisppp", id: "1335715684860166256" },
   { username: "denisweb3", id: "771495349986394133" },
@@ -35,21 +33,16 @@ const CLIPPEURS = [
   { username: "zeikof_", id: "700796189716512808" },
   { username: ".quenntin", id: "281880856707072000" },
   { username: "lalouwww", id: "980148103355174992" },
-  { username: "lilah_58361", id: null },
   { username: "gas2805", id: "855132579203514408" },
   { username: "harald08", id: "1089135713632649246" },
-  { username: "azox08550", id: null },
   { username: "mahmood_7oo_86853", id: "1170372222368632833" },
   { username: "444pwn", id: "782963252078313473" },
-  { username: "benn04", id: null },
   { username: "reyven1312_60357", id: "1390787812223352833" },
   { username: "xarty12345_69818", id: "1296085541661577269" },
-  { username: "thebig_ggggg", id: null },
   { username: "leothecrack0374", id: "1424111262412968066" },
   { username: "yannael_bsn", id: "1112425970973028503" },
   { username: "stringerbell4", id: "1183913262295814186" },
   { username: "rexo7", id: "659143001221627927" },
-  { username: "paquitigno_94546", id: null },
   { username: "yakage2226", id: "471335719445725194" },
   { username: "999window", id: "1027622118973775972" },
   { username: "noctyrix._45615", id: "1387348691530285126" },
@@ -57,6 +50,7 @@ const CLIPPEURS = [
   { username: "cactus14.", id: "1051840272113340447" },
   { username: "_mlle", id: "1026218057523286016" },
   { username: "eco_master.", id: "855515132616507423" },
+  { username: "sup3rsmil3", id: "678683932262137886" },
 ];
 
 const STRIKES_FILE = "./strikes.json";
@@ -70,6 +64,18 @@ function loadStrikes() {
 
 function saveStrikes(data) {
   fs.writeFileSync(STRIKES_FILE, JSON.stringify(data, null, 2));
+}
+
+// Retourne uniquement les strikes des 30 derniers jours
+function getActiveStrikes(strikesData, username) {
+  if (!strikesData[username]) return 0;
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  return strikesData[username].history.filter((dateStr) => {
+    const parts = dateStr.split("/");
+    const date = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    return date >= thirtyDaysAgo;
+  }).length;
 }
 
 async function getPostedUsers() {
@@ -117,7 +123,7 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
     const strikes = loadStrikes();
-    const strikeList = absents.map((u) => `${formatMention(u)} — **${strikes[u.username] ? strikes[u.username].total : 0} strike(s)**`).join("\n");
+    const strikeList = absents.map((u) => `${formatMention(u)} — **${getActiveStrikes(strikes, u.username)} strike(s)**`).join("\n");
     await message.reply(`🚨 **STRIKE TEST — Deadline Check manqué**\n\n${strikeList}`);
   }
 
@@ -161,12 +167,11 @@ cron.schedule("0 0 * * *", async () => {
   const strikes = loadStrikes();
   const today = new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
   absents.forEach((u) => {
-    if (!strikes[u.username]) strikes[u.username] = { total: 0, history: [] };
-    strikes[u.username].total += 1;
+    if (!strikes[u.username]) strikes[u.username] = { history: [] };
     strikes[u.username].history.push(today);
   });
   saveStrikes(strikes);
-  const strikeList = absents.map((u) => `${formatMention(u)} — **${strikes[u.username].total} strike(s)**`).join("\n");
+  const strikeList = absents.map((u) => `${formatMention(u)} — **${getActiveStrikes(strikes, u.username)} strike(s)**`).join("\n");
   await channel.send(`🚨 **STRIKE — Deadline Check manqué**\n\n${strikeList}`);
 }, { timezone: "Europe/Paris" });
 
