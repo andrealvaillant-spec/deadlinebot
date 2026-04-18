@@ -66,7 +66,6 @@ function saveStrikes(data) {
   fs.writeFileSync(STRIKES_FILE, JSON.stringify(data, null, 2));
 }
 
-// Retourne uniquement les strikes des 30 derniers jours
 function getActiveStrikes(strikesData, username) {
   if (!strikesData[username]) return 0;
   const thirtyDaysAgo = new Date();
@@ -81,16 +80,15 @@ function getActiveStrikes(strikesData, username) {
 async function getPostedUsers() {
   const channel = await client.channels.fetch(CHANNEL_ID);
   const now = new Date();
-  const startOfDay = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const messages = await channel.messages.fetch({ limit: 100 });
-  const postedUsernames = new Set();
+  const postedIds = new Set();
   messages.forEach((msg) => {
-    const msgDate = new Date(msg.createdAt.toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-    if (msgDate >= startOfDay) {
-      postedUsernames.add(msg.author.username.toLowerCase());
+    if (msg.createdAt >= since) {
+      postedIds.add(msg.author.id);
     }
   });
-  return postedUsernames;
+  return postedIds;
 }
 
 function formatMention(clippeur) {
@@ -105,18 +103,36 @@ client.on(Events.MessageCreate, async (message) => {
 
   if (content.includes("relance")) {
     const posted = await getPostedUsers();
-    const absents = CLIPPEURS.filter((u) => !posted.has(u.username.toLowerCase()));
+    const absents = CLIPPEURS.filter((u) => !posted.has(u.id));
     if (absents.length === 0) {
       await message.reply("✅ Tout le monde a posté son deadline check !");
       return;
     }
     const mentions = absents.map(formatMention).join(" ");
-    await message.reply(`⚠️ **RELANCE TEST — Deadline Check**\n\nVous avez jusqu'à minuit pour poster votre check !\n\n${mentions}`);
+    await message.reply(`⚠️ **RELANCE — Deadline Check**\n\nVous avez jusqu'à minuit pour poster votre check !\n\n${mentions}`);
+  }
+
+  else if (content.includes("lancer strike")) {
+    const posted = await getPostedUsers();
+    const absents = CLIPPEURS.filter((u) => !posted.has(u.id));
+    if (absents.length === 0) {
+      await message.reply("✅ Aucun strike aujourd'hui, tout le monde a posté !");
+      return;
+    }
+    const strikes = loadStrikes();
+    const today = new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
+    absents.forEach((u) => {
+      if (!strikes[u.username]) strikes[u.username] = { history: [] };
+      strikes[u.username].history.push(today);
+    });
+    saveStrikes(strikes);
+    const strikeList = absents.map((u) => `${formatMention(u)} — **${getActiveStrikes(strikes, u.username)} strike(s)**`).join("\n");
+    await message.reply(`🚨 **STRIKE — Deadline Check manqué**\n\n${strikeList}`);
   }
 
   else if (content.includes("strike")) {
     const posted = await getPostedUsers();
-    const absents = CLIPPEURS.filter((u) => !posted.has(u.username.toLowerCase()));
+    const absents = CLIPPEURS.filter((u) => !posted.has(u.id));
     if (absents.length === 0) {
       await message.reply("✅ Aucun strike aujourd'hui, tout le monde a posté !");
       return;
@@ -136,35 +152,16 @@ client.on(Events.MessageCreate, async (message) => {
     await message.reply(`\`\`\`\n${list}\`\`\``);
   }
 
-else if (content.includes("lancer strike")) {
-    const posted = await getPostedUsers();
-    const absents = CLIPPEURS.filter((u) => !posted.has(u.username.toLowerCase()));
-    if (absents.length === 0) {
-      await message.reply("✅ Aucun strike aujourd'hui, tout le monde a posté !");
-      return;
-    }
-    const strikes = loadStrikes();
-    const today = new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
-    absents.forEach((u) => {
-      if (!strikes[u.username]) strikes[u.username] = { history: [] };
-      strikes[u.username].history.push(today);
-    });
-    saveStrikes(strikes);
-    const strikeList = absents.map((u) => `${formatMention(u)} — **${getActiveStrikes(strikes, u.username)} strike(s)**`).join("\n");
-    await message.reply(`🚨 **STRIKE — Deadline Check manqué**\n\n${strikeList}`);
-  }
-
   else {
-    await message.reply("👋 Commandes disponibles :\n- **@bot relance** → teste la relance\n- **@bot strike** → teste les strikes\n- **@bot lancer strike** → lance les strikes manuellement\n- **@bot ids** → liste tous les IDs");
+    await message.reply("👋 Commandes disponibles :\n- **@bot relance** → relance les absents\n- **@bot strike** → voir les absents\n- **@bot lancer strike** → strike les absents\n- **@bot ids** → liste tous les IDs");
   }
-
 });
 
 cron.schedule("0 23 * * *", async () => {
   console.log("⏰ Relance 23h lancée");
   const channel = await client.channels.fetch(CHANNEL_ID);
   const posted = await getPostedUsers();
-  const absents = CLIPPEURS.filter((u) => !posted.has(u.username.toLowerCase()));
+  const absents = CLIPPEURS.filter((u) => !posted.has(u.id));
   if (absents.length === 0) {
     await channel.send("✅ Tout le monde a posté son deadline check !");
     return;
@@ -177,7 +174,7 @@ cron.schedule("0 0 * * *", async () => {
   console.log("🚨 Attribution des strikes 00h");
   const channel = await client.channels.fetch(CHANNEL_ID);
   const posted = await getPostedUsers();
-  const absents = CLIPPEURS.filter((u) => !posted.has(u.username.toLowerCase()));
+  const absents = CLIPPEURS.filter((u) => !posted.has(u.id));
   if (absents.length === 0) {
     await channel.send("✅ Aucun strike aujourd'hui, tout le monde a posté !");
     return;
