@@ -80,9 +80,8 @@ function getActiveStrikes(strikesData, username) {
 
 async function getPostedUsers() {
   const channel = await client.channels.fetch(CHANNEL_ID);
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const startOfDay = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const messages = await channel.messages.fetch({ limit: 100 });
   const postedUsernames = new Set();
   messages.forEach((msg) => {
@@ -137,9 +136,28 @@ client.on(Events.MessageCreate, async (message) => {
     await message.reply(`\`\`\`\n${list}\`\`\``);
   }
 
-  else {
-    await message.reply("👋 Commandes disponibles :\n- **@bot relance** → teste la relance\n- **@bot strike** → teste les strikes\n- **@bot ids** → liste tous les IDs");
+else if (content.includes("lancer strike")) {
+    const posted = await getPostedUsers();
+    const absents = CLIPPEURS.filter((u) => !posted.has(u.username.toLowerCase()));
+    if (absents.length === 0) {
+      await message.reply("✅ Aucun strike aujourd'hui, tout le monde a posté !");
+      return;
+    }
+    const strikes = loadStrikes();
+    const today = new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
+    absents.forEach((u) => {
+      if (!strikes[u.username]) strikes[u.username] = { history: [] };
+      strikes[u.username].history.push(today);
+    });
+    saveStrikes(strikes);
+    const strikeList = absents.map((u) => `${formatMention(u)} — **${getActiveStrikes(strikes, u.username)} strike(s)**`).join("\n");
+    await message.reply(`🚨 **STRIKE — Deadline Check manqué**\n\n${strikeList}`);
   }
+
+  else {
+    await message.reply("👋 Commandes disponibles :\n- **@bot relance** → teste la relance\n- **@bot strike** → teste les strikes\n- **@bot lancer strike** → lance les strikes manuellement\n- **@bot ids** → liste tous les IDs");
+  }
+
 });
 
 cron.schedule("0 23 * * *", async () => {
