@@ -95,12 +95,24 @@ function formatMention(clippeur) {
   return clippeur.id ? `<@${clippeur.id}>` : `@${clippeur.username}`;
 }
 
+function addStrikes(absents) {
+  const strikes = loadStrikes();
+  const today = new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
+  absents.forEach((u) => {
+    if (!strikes[u.username]) strikes[u.username] = { history: [] };
+    strikes[u.username].history.push(today);
+  });
+  saveStrikes(strikes);
+  return strikes;
+}
+
 client.on(Events.MessageCreate, async (message) => {
   console.log(`Message reçu de ${message.author.username}: ${message.content}`);
   if (!message.mentions.has(client.user)) return;
   if (message.author.bot) return;
   const content = message.content.toLowerCase();
 
+  // Relance
   if (content.includes("relance")) {
     const posted = await getPostedUsers();
     const absents = CLIPPEURS.filter((u) => !posted.has(u.id));
@@ -112,24 +124,20 @@ client.on(Events.MessageCreate, async (message) => {
     await message.reply(`⚠️ **RELANCE — Deadline Check**\n\nVous avez jusqu'à minuit pour poster votre check !\n\n${mentions}`);
   }
 
-  else if (content.includes("lancer strike")) {
+  // Test strike — affiche les absents SANS ajouter de strike
+  else if (content.includes("test strike")) {
     const posted = await getPostedUsers();
     const absents = CLIPPEURS.filter((u) => !posted.has(u.id));
     if (absents.length === 0) {
-      await message.reply("✅ Aucun strike aujourd'hui, tout le monde a posté !");
+      await message.reply("✅ Tout le monde a posté son deadline check !");
       return;
     }
     const strikes = loadStrikes();
-    const today = new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
-    absents.forEach((u) => {
-      if (!strikes[u.username]) strikes[u.username] = { history: [] };
-      strikes[u.username].history.push(today);
-    });
-    saveStrikes(strikes);
     const strikeList = absents.map((u) => `${formatMention(u)} — **${getActiveStrikes(strikes, u.username)} strike(s)**`).join("\n");
-    await message.reply(`🚨 **STRIKE — Deadline Check manqué**\n\n${strikeList}`);
+    await message.reply(`👀 **TEST — Absents aujourd'hui (aucun strike ajouté)**\n\n${strikeList}`);
   }
 
+  // Strike — affiche les absents ET ajoute 1 strike
   else if (content.includes("strike")) {
     const posted = await getPostedUsers();
     const absents = CLIPPEURS.filter((u) => !posted.has(u.id));
@@ -137,9 +145,9 @@ client.on(Events.MessageCreate, async (message) => {
       await message.reply("✅ Aucun strike aujourd'hui, tout le monde a posté !");
       return;
     }
-    const strikes = loadStrikes();
+    const strikes = addStrikes(absents);
     const strikeList = absents.map((u) => `${formatMention(u)} — **${getActiveStrikes(strikes, u.username)} strike(s)**`).join("\n");
-    await message.reply(`🚨 **STRIKE TEST — Deadline Check manqué**\n\n${strikeList}`);
+    await message.reply(`🚨 **STRIKE — Deadline Check manqué**\n\n${strikeList}`);
   }
 
   else if (content.includes("ids")) {
@@ -153,7 +161,7 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   else {
-    await message.reply("👋 Commandes disponibles :\n- **@bot relance** → relance les absents\n- **@bot strike** → voir les absents\n- **@bot lancer strike** → strike les absents\n- **@bot ids** → liste tous les IDs");
+    await message.reply("👋 Commandes disponibles :\n- **@bot relance** → relance les absents\n- **@bot test strike** → voir les absents sans striker\n- **@bot strike** → striker les absents (+1 strike)\n- **@bot ids** → liste tous les IDs");
   }
 });
 
@@ -179,13 +187,7 @@ cron.schedule("0 0 * * *", async () => {
     await channel.send("✅ Aucun strike aujourd'hui, tout le monde a posté !");
     return;
   }
-  const strikes = loadStrikes();
-  const today = new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
-  absents.forEach((u) => {
-    if (!strikes[u.username]) strikes[u.username] = { history: [] };
-    strikes[u.username].history.push(today);
-  });
-  saveStrikes(strikes);
+  const strikes = addStrikes(absents);
   const strikeList = absents.map((u) => `${formatMention(u)} — **${getActiveStrikes(strikes, u.username)} strike(s)**`).join("\n");
   await channel.send(`🚨 **STRIKE — Deadline Check manqué**\n\n${strikeList}`);
 }, { timezone: "Europe/Paris" });
