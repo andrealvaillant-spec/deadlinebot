@@ -105,7 +105,6 @@ client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
   const content = message.content.toLowerCase();
 
-  // Relance
   if (content.includes("relance")) {
     const posted = await getPostedUsers();
     const absents = CLIPPEURS.filter((u) => !posted.has(u.id));
@@ -117,7 +116,6 @@ client.on(Events.MessageCreate, async (message) => {
     await message.reply(`⚠️ **RELANCE — Deadline Check**\n\nVous avez jusqu'à minuit pour poster votre check !\n\n${mentions}`);
   }
 
-  // Test strike — affiche les absents SANS ajouter de strike
   else if (content.includes("test strike")) {
     const posted = await getPostedUsers();
     const absents = CLIPPEURS.filter((u) => !posted.has(u.id));
@@ -130,7 +128,55 @@ client.on(Events.MessageCreate, async (message) => {
     await message.reply(`👀 **TEST — Absents aujourd'hui (aucun strike ajouté)**\n\n${strikeList}`);
   }
 
-  // Strike — affiche les absents ET ajoute 1 strike
+  else if (content.includes("-1 strike")) {
+    const mentioned = message.mentions.users.filter(u => u.id !== client.user.id).first();
+    if (!mentioned) {
+      await message.reply("❌ Mentionne un clippeur ! Ex: **@bot -1 strike @pseudo**");
+      return;
+    }
+    const clippeur = CLIPPEURS.find(c => c.id === mentioned.id);
+    if (!clippeur) {
+      await message.reply("❌ Ce membre n'est pas dans la liste des clippeurs !");
+      return;
+    }
+    const strikes = loadStrikes();
+    if (!strikes[clippeur.username] || strikes[clippeur.username].history.length === 0) {
+      await message.reply(`ℹ️ ${formatMention(clippeur)} n'a aucun strike !`);
+      return;
+    }
+    strikes[clippeur.username].history.pop();
+    saveStrikes(strikes);
+    await message.reply(`✅ **-1 strike** pour ${formatMention(clippeur)} — il lui reste **${getActiveStrikes(strikes, clippeur.username)} strike(s)**`);
+  }
+
+  else if (content.includes("reset strike")) {
+    const mentioned = message.mentions.users.filter(u => u.id !== client.user.id).first();
+    const strikes = loadStrikes();
+    if (mentioned) {
+      const clippeur = CLIPPEURS.find(c => c.id === mentioned.id);
+      if (!clippeur) {
+        await message.reply("❌ Ce membre n'est pas dans la liste des clippeurs !");
+        return;
+      }
+      strikes[clippeur.username] = { history: [] };
+      saveStrikes(strikes);
+      await message.reply(`✅ Strikes de ${formatMention(clippeur)} remis à **0** !`);
+    } else {
+      CLIPPEURS.forEach(c => { strikes[c.username] = { history: [] }; });
+      saveStrikes(strikes);
+      await message.reply("✅ Strikes de **tout le serveur** remis à **0** !");
+    }
+  }
+
+  else if (content.includes("recap")) {
+    const strikes = loadStrikes();
+    const list = CLIPPEURS
+      .map(u => ({ u, count: getActiveStrikes(strikes, u.username) }))
+      .sort((a, b) => b.count - a.count);
+    const recap = list.map(({ u, count }) => `${formatMention(u)} — **${count} strike(s)**`).join("\n");
+    await message.reply(`📊 **RÉCAP STRIKES (30 derniers jours)**\n\n${recap}`);
+  }
+
   else if (content.includes("strike")) {
     const posted = await getPostedUsers();
     const absents = CLIPPEURS.filter((u) => !posted.has(u.id));
@@ -154,63 +200,8 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   else {
-// -1 strike @mention
-  else if (content.includes("-1 strike")) {
-    const mentioned = message.mentions.users.filter(u => u.id !== client.user.id).first();
-    if (!mentioned) {
-      await message.reply("❌ Mentionne un clippeur ! Ex: **@bot -1 strike @pseudo**");
-      return;
-    }
-    const clippeur = CLIPPEURS.find(c => c.id === mentioned.id);
-    if (!clippeur) {
-      await message.reply("❌ Ce membre n'est pas dans la liste des clippeurs !");
-      return;
-    }
-    const strikes = loadStrikes();
-    if (!strikes[clippeur.username] || strikes[clippeur.username].history.length === 0) {
-      await message.reply(`ℹ️ ${formatMention(clippeur)} n'a aucun strike !`);
-      return;
-    }
-    strikes[clippeur.username].history.pop();
-    saveStrikes(strikes);
-    await message.reply(`✅ **-1 strike** pour ${formatMention(clippeur)} — il lui reste **${getActiveStrikes(strikes, clippeur.username)} strike(s)**`);
-  }
-
-  // Reset strikes
-  else if (content.includes("reset strike")) {
-    const mentioned = message.mentions.users.filter(u => u.id !== client.user.id).first();
-    const strikes = loadStrikes();
-
-    if (mentioned) {
-      const clippeur = CLIPPEURS.find(c => c.id === mentioned.id);
-      if (!clippeur) {
-        await message.reply("❌ Ce membre n'est pas dans la liste des clippeurs !");
-        return;
-      }
-      strikes[clippeur.username] = { history: [] };
-      saveStrikes(strikes);
-      await message.reply(`✅ Strikes de ${formatMention(clippeur)} remis à **0** !`);
-    } else {
-      CLIPPEURS.forEach(c => { strikes[c.username] = { history: [] }; });
-      saveStrikes(strikes);
-      await message.reply("✅ Strikes de **tout le serveur** remis à **0** !");
-    }
-  }
-
-  // Récap strikes
-  else if (content.includes("recap")) {
-    const strikes = loadStrikes();
-    const list = CLIPPEURS
-      .map(u => ({ u, count: getActiveStrikes(strikes, u.username) }))
-      .sort((a, b) => b.count - a.count);
-
-    const recap = list.map(({ u, count }) => `${formatMention(u)} — **${count} strike(s)**`).join("\n");
-    await message.reply(`📊 **RÉCAP STRIKES (30 derniers jours)**\n\n${recap}`);
-  }
-
-  else {
     await message.reply("👋 Commandes disponibles :\n- **@bot relance** → relance les absents\n- **@bot test strike** → voir les absents sans striker\n- **@bot strike** → striker les absents (+1 strike)\n- **@bot -1 strike @pseudo** → enlever 1 strike\n- **@bot reset strike @pseudo** → reset un clippeur\n- **@bot reset strike** → reset tout le serveur\n- **@bot recap** → récap des strikes\n- **@bot ids** → liste tous les IDs");
-  }  }
+  }
 });
 
 cron.schedule("0 23 * * *", async () => {
