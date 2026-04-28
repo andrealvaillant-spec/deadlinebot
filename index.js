@@ -16,19 +16,13 @@ const TOKEN = process.env.TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 
 const CLIPPEURS = [
-  { username: "laurent005584", id: "1295112247563259987" },
   { username: "jeanbaptiste3494", id: "695582447441543228" },
   { username: "gowizzus", id: "1106304129745305692" },
-  { username: "caba4526", id: "1123510632604508170" },
-  { username: "batultim3555", id: "999630067024011285" },
-  { username: "maxime_1610", id: "499586906598932511" },
   { username: "zan0m", id: "769635925994635285" },
-  { username: "ykama.", id: "1044715544026292224" },
   { username: "r_xphael", id: "1274481696561172623" },
   { username: "wwisppp", id: "1335715684860166256" },
   { username: "denisweb3", id: "771495349986394133" },
   { username: "_juxles_", id: "577118344667201536" },
-  { username: "wisie_12", id: "488310265520324619" },
   { username: "jrc0510", id: "1196063285519319072" },
   { username: "zeikof_", id: "700796189716512808" },
   { username: ".quenntin", id: "281880856707072000" },
@@ -37,7 +31,6 @@ const CLIPPEURS = [
   { username: "harald08", id: "1089135713632649246" },
   { username: "mahmood_7oo_86853", id: "1170372222368632833" },
   { username: "444pwn", id: "782963252078313473" },
-  { username: "reyven1312_60357", id: "1390787812223352833" },
   { username: "xarty12345_69818", id: "1296085541661577269" },
   { username: "leothecrack0374", id: "1424111262412968066" },
   { username: "yannael_bsn", id: "1112425970973028503" },
